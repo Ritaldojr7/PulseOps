@@ -1,0 +1,129 @@
+services:
+  # Local Postgres is optional. Only starts when you run:
+  #   docker compose --profile localdb up -d
+  # If you use Supabase / another managed DB via JDBC_URL in .env, leave this disabled.
+  postgres:
+    image: postgres:16-alpine
+    container_name: pulseops-postgres
+    profiles: ["localdb"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pulseops
+      POSTGRES_USER: pulseops
+      POSTGRES_PASSWORD: pulseops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulseops -d pulseops"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [pulseops]
+
+  redis:
+    image: redis:7-alpine
+    container_name: pulseops-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [pulseops]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: pulseops-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks: [pulseops]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: pulseops-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [pulseops]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pulseops-backend
+    restart: unless-stopped
+    depends_on:
+      redis:    { condition: service_healthy }
+      kafka:    { condition: service_healthy }
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: 8080
+      # DB: either set JDBC_URL in .env (full JDBC string) OR these split vars (defaults = local postgres service)
+      JDBC_URL: ${JDBC_URL:-}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-pulseops}
+      POSTGRES_USER: ${POSTGRES_USER:-pulseops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulseops}
+      POSTGRES_JDBC_PARAMS: ${POSTGRES_JDBC_PARAMS:-}
+      DATASOURCE_USERNAME: ${DATASOURCE_USERNAME:-}
+      DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-this-is-a-very-long-secret-key-256bits-min}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks: [pulseops]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pulseops-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks: [pulseops]
+
+volumes:
+  pgdata:
+
+networks:
+  pulseops:
+    driver: bridge

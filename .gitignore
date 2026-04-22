@@ -1,0 +1,21 @@
+.env
+.env.local
+
+# Java
+backend/target/
+backend/.idea/
+backend/*.iml
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local / build logs
+compose-build.log
+**/__pycache__/
+*.pyc

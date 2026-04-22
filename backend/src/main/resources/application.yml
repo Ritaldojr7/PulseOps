@@ -1,0 +1,98 @@
+server:
+  port: ${SERVER_PORT:8080}
+  # Trust X-Forwarded-* / CF-Connecting-IP when behind Cloudflare or a load balancer
+  forward-headers-strategy: framework
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: pulseops-backend
+
+  datasource:
+    # Option A — one line: set JDBC_URL in .env (Supabase session pooler, etc.). Put user & password in the URL.
+    #   Then set POSTGRES_USER= and POSTGRES_PASSWORD= empty in .env so defaults do not override the URL.
+    # Option B — split: POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+    #   Optional: POSTGRES_JDBC_PARAMS=?sslmode=require for cloud TLS
+    url: ${JDBC_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pulseops}${POSTGRES_JDBC_PARAMS:}}
+    username: ${DATASOURCE_USERNAME:${POSTGRES_USER:pulseops}}
+    password: ${DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:pulseops}}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+    open-in-view: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: pulseops-event-processor
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.pulseops.*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.pulseops.dto.EventDto
+    listener:
+      ack-mode: record
+      concurrency: 3
+
+pulseops:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-this-is-a-very-long-secret-key-256bits-min}
+    expiration-ms: 86400000   # 24 hours
+    issuer: pulseops
+  security:
+    auth-login-attempts-per-minute: 30
+    auth-register-attempts-per-minute: 10
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:3000
+  anomaly:
+    window-seconds: 60
+    error-threshold: 10
+    rate-limit-per-minute: 600
+  kafka:
+    topic:
+      events: pulseops.events
+      alerts: pulseops.alerts
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    root: INFO
+    com.pulseops: INFO
+    org.springframework.security: WARN
+    org.apache.kafka: WARN

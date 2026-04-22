@@ -1,0 +1,14 @@
+{
+  "name": "pulseops-node-agent",
+  "version": "1.0.0",
+  "description": "Streams real host telemetry to PulseOps via the /api/events API key endpoint.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node agent.mjs",
+    "check": "node --check agent.mjs"
+  }
+}
