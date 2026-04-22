@@ -74,6 +74,12 @@ shows live charts and alerts immediately. Disable with
 
 ---
 
+## Deploy (backend on Render)
+
+Use the included **`render.yaml`** (Render **Blueprint**) or follow **`docs/RENDER.md`**: provision **PostgreSQL** on Render, set **Redis** (Render Key Value or Upstash `SPRING_DATA_REDIS_URL`), add a hosted **Kafka** (`KAFKA_BOOTSTRAP_SERVERS`), **`JWT_SECRET`**, and **CORS** for your frontend. The app listens on Render’s **`PORT`**.
+
+---
+
 ## Project layout
 
 ```

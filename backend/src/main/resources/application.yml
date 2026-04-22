@@ -1,5 +1,6 @@
+# Render and other PaaS set PORT; local dev uses 8080
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
   # Trust X-Forwarded-* / CF-Connecting-IP when behind Cloudflare or a load balancer
   forward-headers-strategy: framework
   error:
@@ -34,6 +35,7 @@ spring:
 
   data:
     redis:
+      # Optional: set SPRING_DATA_REDIS_URL (e.g. rediss://… from Upstash) in Render; overrides host/port
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       timeout: 2000ms
@@ -68,10 +70,9 @@ pulseops:
   security:
     auth-login-attempts-per-minute: 30
     auth-register-attempts-per-minute: 10
+  # Comma-separated list (also override with env PULSEOPS_CORS_ALLOWED_ORIGINS on Render)
   cors:
-    allowed-origins:
-      - http://localhost:5173
-      - http://localhost:3000
+    allowed-origins: ${PULSEOPS_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   anomaly:
     window-seconds: 60
     error-threshold: 10

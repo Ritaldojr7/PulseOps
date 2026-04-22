@@ -1,0 +1,62 @@
+# Render Blueprint — Dashboard → New → Blueprint → connect this repo.
+# Full steps (Kafka, Redis options, CORS): docs/RENDER.md
+#
+# After first deploy, set in the Render service → Environment:
+#   KAFKA_BOOTSTRAP_SERVERS  (from Confluent Cloud / Aiven / etc.)
+#   JWT_SECRET                (long random string)
+#   Redis: either add Render Key Value, or use Upstash and set SPRING_DATA_REDIS_URL
+#   PULSEOPS_CORS_ALLOWED_ORIGINS  (your frontend URL, comma-separated)
+#
+# https://docs.render.com/blueprint-spec
+
+databases:
+  - name: pulseops-db
+    databaseName: pulseops
+    user: pulseops
+    plan: free
+
+services:
+  - type: web
+    name: pulseops-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: POSTGRES_JDBC_PARAMS
+        value: "?sslmode=require"
+      - key: PULSEOPS_CORS_ALLOWED_ORIGINS
+        value: "http://localhost:5173,http://localhost:3000"
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: pulseops-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: pulseops-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: pulseops-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: pulseops-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: pulseops-db
+          property: database
+      # Redis: add Render "Key Value" in dashboard and set REDIS_HOST + REDIS_PORT, or set SPRING_DATA_REDIS_URL (Upstash) — see docs/RENDER.md
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: SPRING_DATA_REDIS_URL
+        sync: false
